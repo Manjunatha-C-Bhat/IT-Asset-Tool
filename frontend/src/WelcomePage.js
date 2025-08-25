@@ -305,9 +305,9 @@ const WelcomePage = () => {
             {/* Hero Section */}
             <section id="hero" style={heroSectionStyle}>
                 <div style={heroContentStyle}>
-                    <h1 style={heroTitleStyle}>Welcome To AssetTracker</h1>
+                    <h1 style={heroTitleStyle}>Welcome to Asset Tracker</h1>
                     <p style={heroTextStyle}>
-                        This internal IT Asset Management system is exclusively designed for our company's IT team.
+                        This IT Asset Management system is designed exclusively for our internal IT team.
                         <br/><br/>
                         It provides comprehensive hardware tracking, auditing, and lifecycle management for all IT hardware resources.
                         Optimize hardware resources, enhance security, and maintain audit readiness with our powerful internal ITAM solution.

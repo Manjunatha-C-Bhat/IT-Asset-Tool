@@ -17,6 +17,11 @@ import './styles.css';
 const { Title } = Typography;
 const { Option } = Select;
 
+// Capitalize every word in a string, e.g. "data science" -> "Data Science"
+function capitalizeWords(str = '') {
+  return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 const getStatusColor = (status) => ({
   'In Use': '#7ED321',
   'In Stock': '#FA8C16',
@@ -42,17 +47,22 @@ const renderWarrantyTag = (date) => {
 
 const groupAssetsByEmail = (assets) => {
   const grouped = assets.reduce((acc, asset) => {
-    const emailKey = asset.employeeEmail || 'unknown';
+    const emailKey = asset.employeeEmail ? asset.employeeEmail.toLowerCase() : 'unknown';
     if (!acc[emailKey]) {
       acc[emailKey] = {
         employeeEmail: emailKey,
         assigneeName: asset.assigneeName || '',
         phoneNumber: asset.phoneNumber || '',
-        department: asset.department || '',
+        department: capitalizeWords(asset.department || ''),
         assets: [],
       };
     }
-    acc[emailKey].assets.push(asset);
+    acc[emailKey].assets.push({
+      ...asset,
+      employeeEmail: asset.employeeEmail ? asset.employeeEmail.toLowerCase() : asset.employeeEmail,
+      department: capitalizeWords(asset.department || ''),
+      position: capitalizeWords(asset.position || ''),
+    });
     return acc;
   }, {});
   return Object.values(grouped);
@@ -80,10 +90,10 @@ const assetTableRows = asset => [
 
 const assigneeRows = asset => [
   ['Assignee Name', asset.assigneeName || 'N/A'],
-  ['Employee Email', asset.employeeEmail || 'N/A'],
-  ['Position', asset.position || 'N/A'],
+  ['Employee Email', asset.employeeEmail ? asset.employeeEmail.toLowerCase() : 'N/A'],
+  ['Position', capitalizeWords(asset.position) || 'N/A'],
   ['Phone Number', asset.phoneNumber || 'N/A'],
-  ['Department', asset.department || 'N/A'],
+  ['Department', capitalizeWords(asset.department) || 'N/A'],
 ];
 
 const InUse = ({ user }) => {
@@ -110,7 +120,7 @@ const InUse = ({ user }) => {
 
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
 
-  // Main table columns for the grouped by employeeEmail table
+  // Main table columns for the Employee group table
   const columns = [
     {
       title: 'Sl No',
@@ -119,10 +129,26 @@ const InUse = ({ user }) => {
       render: (_, __, i) => (pagination.current - 1) * pagination.pageSize + i + 1,
       width: 70,
     },
-    { title: 'Assignee', dataIndex: 'assigneeName', key: 'assigneeName', sorter: (a, b) => (a.assigneeName || '').localeCompare(b.assigneeName || '') },
-    { title: 'Email', dataIndex: 'employeeEmail', key: 'employeeEmail' },
+    {
+      title: 'Assignee',
+      dataIndex: 'assigneeName',
+      key: 'assigneeName',
+      sorter: (a, b) => (a.assigneeName || '').localeCompare(b.assigneeName || '')
+    },
+    {
+      title: 'Email',
+      dataIndex: 'employeeEmail',
+      key: 'employeeEmail',
+      render: (text) => text ? text.toLowerCase() : '',
+    },
     { title: 'Phone', dataIndex: 'phoneNumber', key: 'phoneNumber' },
-    { title: 'Department', dataIndex: 'department', key: 'department', sorter: (a, b) => (a.department || '').localeCompare(b.department || '') },
+    {
+      title: 'Department',
+      dataIndex: 'department',
+      key: 'department',
+      render: (text) => capitalizeWords(text),
+      sorter: (a, b) => (a.department || '').localeCompare(b.department || '')
+    },
     { title: 'Asset Count', key: 'assetCount', render: (_, record) => record.assets.length, sorter: (a, b) => a.assets.length - b.assets.length },
     { title: 'Actions', key: 'actions',
       render: (_, record) => (
@@ -311,23 +337,39 @@ const InUse = ({ user }) => {
     setSelectedAsset(record);
     editForm.setFieldsValue({
       ...record,
+      employeeEmail: record.employeeEmail ? record.employeeEmail.toLowerCase() : record.employeeEmail,
+      department: capitalizeWords(record.department || ''),
+      position: capitalizeWords(record.position || ''),
       warrantyInfo: record.warrantyInfo ? moment(record.warrantyInfo) : null,
       purchaseDate: record.purchaseDate ? moment(record.purchaseDate) : null,
     });
     setIsEditModalVisible(true);
   };
 
+  const phoneCustomValidator = (_, value) => {
+    if (!value) return Promise.reject(new Error('Phone number is required'));
+    if (!/^\d{10}$/.test(value)) return Promise.reject(new Error('Phone number must be exactly 10 digits'));
+    if (/^(\d)\1{9}$/.test(value)) return Promise.reject(new Error('Phone number cannot be all repeated digits'));
+    return Promise.resolve();
+  };
+
   const handleSaveEditView = async () => {
     try {
       const values = await editForm.validateFields();
       const updatedAsset = { ...values };
-      // Only format if Moment object
+
       if (updatedAsset.warrantyInfo && moment.isMoment(updatedAsset.warrantyInfo)) {
         updatedAsset.warrantyInfo = updatedAsset.warrantyInfo.format('YYYY-MM-DD');
       }
       if (updatedAsset.purchaseDate && moment.isMoment(updatedAsset.purchaseDate)) {
         updatedAsset.purchaseDate = updatedAsset.purchaseDate.format('YYYY-MM-DD');
       }
+
+      // Lowercase email, capitalize all words for position and department before sending
+      updatedAsset.employeeEmail = updatedAsset.employeeEmail ? updatedAsset.employeeEmail.toLowerCase() : updatedAsset.employeeEmail;
+      updatedAsset.department = capitalizeWords(updatedAsset.department);
+      updatedAsset.position = capitalizeWords(updatedAsset.position);
+
       const payloadToSend = {
         category: updatedAsset.category,
         model: updatedAsset.model,
@@ -342,7 +384,7 @@ const InUse = ({ user }) => {
         department: updatedAsset.department,
         damageDescription: updatedAsset.status === 'Damaged' ? updatedAsset.damageDescription : null,
         purchaseDate: updatedAsset.purchaseDate,
-        status: updatedAsset.status,  // Still included, but see below (disabled in modal)
+        status: updatedAsset.status,
         purchasePrice: updatedAsset.purchasePrice,
       };
       for (const k of ['assigneeName','position','employeeEmail','phoneNumber','department','comment','damageDescription'])
@@ -465,162 +507,164 @@ const InUse = ({ user }) => {
       </Modal>
 
       {/* Edit Modal */}
-     {/* Edit Modal */}
-     <Modal
-       title="Edit Asset"
-       open={isEditModalVisible}
-       onCancel={() => { setIsEditModalVisible(false); setSelectedAsset(null); editForm.resetFields(); }}
-       footer={[
-         <Button key="cancel" onClick={() => { setIsEditModalVisible(false); setSelectedAsset(null); editForm.resetFields(); }}>Cancel</Button>,
-         <Button key="submit" type="primary" onClick={handleSaveEditView}>Save</Button>
-       ]}
-       width={700}
-       centered
-       destroyOnClose
-     >
-       {selectedAsset && (
-         <Form form={editForm} layout="vertical">
-           <Row gutter={12}>
-             <Col span={12}>
-               <Form.Item
-                 label="Model"
-                 name="model"
-                 rules={[
-                   { required: true },
-                   { min: 5, message: 'Model must be at least 5 characters' }
-                 ]}
-               >
-                 <Input />
-               </Form.Item>
-             </Col>
-             <Col span={12}>
-               <Form.Item
-                 label="Category"
-                 name="category"
-                 rules={[{ required: true }]}
-               >
-                 <Select>{categoryOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}</Select>
-               </Form.Item>
-             </Col>
-           </Row>
-           <Row gutter={12}>
-             <Col span={12}>
-               <Form.Item
-                 label="Serial Number"
-                 name="serialNumber"
-                 rules={[
-                   { required: true },
-                   { min: 5, message: 'Serial Number must be at least 5 characters' }
-                 ]}
-               >
-                 <Input />
-               </Form.Item>
-             </Col>
-             <Col span={12}>
-               <Form.Item
-                 label="Status"
-                 name="status"
-                 rules={[{ required: true }]}
-               >
-                 <Select disabled /* Block status changing here! */>
-                   {statusOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}
-                 </Select>
-               </Form.Item>
-             </Col>
-           </Row>
-           <Row gutter={12}>
-             <Col span={12}>
-               <Form.Item
-                 label="Location"
-                 name="location"
-                 rules={[{ required: true }]}
-               >
-                 <Select>{locationOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}</Select>
-               </Form.Item>
-             </Col>
-             <Col span={12}>
-               <Form.Item label="Purchase Price" name="purchasePrice">
-                 <Input />
-               </Form.Item>
-             </Col>
-           </Row>
-           <Row gutter={12}>
-             <Col span={12}><Form.Item label="Purchase Date" name="purchaseDate"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
-             <Col span={12}><Form.Item label="Warranty Info" name="warrantyInfo"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
-           </Row>
-           <Typography.Title level={5} style={{ fontSize: '14px', marginTop: 20, marginBottom: 8 }}>Assignee Details</Typography.Title>
-           <Row gutter={12}>
-             <Col span={12}>
-               <Form.Item
-                 label="Assignee Name"
-                 name="assigneeName"
-                 rules={[
-                   { required: true },
-                   { pattern: /^[A-Za-z\s]+$/, message: 'Assignee Name must contain alphabets only' },
-                   { min: 4, message: 'Assignee Name must be at least 4 characters' }
-                 ]}
-               >
-                 <Input />
-               </Form.Item>
-             </Col>
-             <Col span={12}>
-               <Form.Item
-                 label="Employee Email"
-                 name="employeeEmail"
-                 rules={[
-                   { required: true },
-                   { type: 'email', message: 'Enter a valid email' }
-                 ]}
-               >
-                 <Input />
-               </Form.Item>
-             </Col>
-           </Row>
-           <Row gutter={12}>
-             <Col span={12}>
-               <Form.Item
-                 label="Position"
-                 name="position"
-                 rules={[
-                   { required: true },
-                   { pattern: /^[A-Za-z\s]+$/, message: 'Position must contain alphabets only' },
-                   { min: 2, message: 'Position must be at least 2 characters' }
-                 ]}
-               >
-                 <Input />
-               </Form.Item>
-             </Col>
-             <Col span={12}>
-               <Form.Item
-                 label="Department"
-                 name="department"
-                 rules={[
-                   { required: true },
-                   { pattern: /^[A-Za-z\s]+$/, message: 'Department must contain alphabets only' },
-                   { min: 2, message: 'Department must be at least 2 characters' }
-                 ]}
-               >
-                 <Input />
-               </Form.Item>
-             </Col>
-           </Row>
-           <Row gutter={12}>
-             <Col span={12}>
-               <Form.Item
-                 label="Phone"
-                 name="phoneNumber"
-                 rules={[
-                   { required: true },
-                   { pattern: /^\d{10}$/, message: 'Phone number must be exactly 10 digits' }
-                 ]}
-               >
-                 <Input />
-               </Form.Item>
-             </Col>
-           </Row>
-         </Form>
-       )}
-     </Modal>
+      <Modal
+        title="Edit Asset"
+        open={isEditModalVisible}
+        onCancel={() => { setIsEditModalVisible(false); setSelectedAsset(null); editForm.resetFields(); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setIsEditModalVisible(false); setSelectedAsset(null); editForm.resetFields(); }}>Cancel</Button>,
+          <Button key="submit" type="primary" onClick={handleSaveEditView}>Save</Button>
+        ]}
+        width={700}
+        centered
+        destroyOnClose
+      >
+        {selectedAsset && (
+          <Form form={editForm} layout="vertical">
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  label="Model"
+                  name="model"
+                  rules={[
+                    { required: true },
+                    { min: 5, message: 'Model must be at least 5 characters' }
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="Category"
+                  name="category"
+                  rules={[{ required: true }]}
+                >
+                  <Select>{categoryOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}</Select>
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  label="Serial Number"
+                  name="serialNumber"
+                  rules={[
+                    { required: true },
+                    { min: 5, message: 'Serial Number must be at least 5 characters' }
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="Status"
+                  name="status"
+                  rules={[{ required: true }]}
+                >
+                  <Select disabled>
+                    {statusOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  label="Location"
+                  name="location"
+                  rules={[{ required: true }]}
+                >
+                  <Select>{locationOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}</Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Purchase Price" name="purchasePrice">
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={12}>
+              <Col span={12}><Form.Item label="Purchase Date" name="purchaseDate"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
+              <Col span={12}><Form.Item label="Warranty Info" name="warrantyInfo"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
+            </Row>
+            <Typography.Title level={5} style={{ fontSize: '14px', marginTop: 20, marginBottom: 8 }}>Assignee Details</Typography.Title>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  label="Assignee Name"
+                  name="assigneeName"
+                  rules={[
+                    { required: true },
+                    { pattern: /^[A-Za-z\s]+$/, message: 'Assignee Name must contain alphabets only' },
+                    { min: 4, message: 'Assignee Name must be at least 4 characters' }
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="Employee Email"
+                  name="employeeEmail"
+                  rules={[
+                    { required: true },
+                    { type: 'email', message: 'Enter a valid email' }
+                  ]}
+                  normalize={val => val && val.toLowerCase()}
+                >
+                  <Input style={{ textTransform: 'lowercase' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  label="Position"
+                  name="position"
+                  rules={[
+                    { required: true },
+                    { pattern: /^[A-Za-z\s]+$/, message: 'Position must contain alphabets only' },
+                    { min: 2, message: 'Position must be at least 2 characters' }
+                  ]}
+                  normalize={capitalizeWords}
+                >
+                  <Input style={{ textTransform: 'capitalize' }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="Department"
+                  name="department"
+                  rules={[
+                    { required: true },
+                    { pattern: /^[A-Za-z\s]+$/, message: 'Department must contain alphabets only' },
+                    { min: 2, message: 'Department must be at least 2 characters' }
+                  ]}
+                  normalize={capitalizeWords}
+                >
+                  <Input style={{ textTransform: 'capitalize' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  label="Phone"
+                  name="phoneNumber"
+                  rules={[
+                    { required: true },
+                    { validator: phoneCustomValidator }
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Form>
+        )}
+      </Modal>
 
       {/* Info Modal */}
       <Modal
@@ -668,7 +712,6 @@ const InUse = ({ user }) => {
           </div>
         )}
       </Modal>
-      {/* ...return modal and other logic as you had */}
     </>
   );
 };
