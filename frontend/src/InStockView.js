@@ -489,180 +489,199 @@ const InStockView = ({ user }) => {
 
 
       {/* Assign Modal with Updated Validation */}
-      <Modal
-        title={`Assign: ${selectedEquipment?.model || ''}`}
-        open={isAssignModalVisible}
-        onOk={handleAssignSubmit}
-        onCancel={() => setIsAssignModalVisible(false)}
-        okText="Assign"
-        destroyOnClose
-        okButtonProps={{ disabled: user?.role === "Viewer" }}
-        cancelButtonProps={{ disabled: user?.role === "Viewer" }}
-      >
-        <Form layout="vertical" form={form}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="assigneeName"
-                label="Assignee Name"
-                rules={[
-                  { required: true, message: 'Assignee name is required' },
-                  {
-                    pattern: /^[a-zA-Z\s]+$/,
-                    message: 'Name should contain only letters and spaces'
-                  },
-                  {
-                    min: 2,
-                    message: 'Name must be at least 2 characters long'
-                  }
-                ]}
-              >
-                <Input
-                  disabled={user?.role === "Viewer"}
-                  placeholder="Enter assignee name"
-                  onKeyPress={(e) => {
-                    // Allow only letters and spaces
-                    if (!/[a-zA-Z\s]/.test(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                  onChange={(e) => {
-                    // Remove any numbers or special characters
-                    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                    form.setFieldsValue({ assigneeName: value });
-                  }}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="position" label="Position" rules={[{ required: true }]}>
-                <Input disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="employeeEmail"
-                label="Employee Email"
-                rules={[{ required: true, type: 'email' }]}
-              >
-                <Input disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="phoneNumber"
-                label="Phone Number"
-                rules={[
-                  { required: true, message: 'Phone number is required' },
-                  {
-                    pattern: /^[0-9]{10,15}$/,
-                    message: 'Phone number must be 10-15 digits only'
-                  }
-                ]}
-              >
-                <Input
-                  disabled={user?.role === "Viewer"}
-                  placeholder="Enter phone number (10-15 digits)"
-                  maxLength={15}
-                  onKeyPress={(e) => {
-                    // Allow only digits
-                    if (!/[0-9]/.test(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                  onChange={(e) => {
-                    // Remove any non-digit characters
-                    const value = e.target.value.replace(/[^0-9]/g, '');
-                    form.setFieldsValue({ phoneNumber: value });
-                  }}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={24}>
-              <Form.Item name="department" label="Department" rules={[{ required: true }]}>
-                <Input disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
+     <Modal
+       title={`Assign: ${selectedEquipment?.model || ''}`}
+       open={isAssignModalVisible}
+       onOk={handleAssignSubmit}
+       onCancel={() => setIsAssignModalVisible(false)}
+       okText="Assign"
+       destroyOnClose
+       okButtonProps={{ disabled: user?.role === "Viewer" }}
+       cancelButtonProps={{ disabled: user?.role === "Viewer" }}
+     >
+       <Form layout="vertical" form={form}>
+         <Row gutter={16}>
+           <Col span={12}>
+             <Form.Item
+               name="assigneeName"
+               label="Assignee Name"
+               rules={[
+                 { required: true, message: 'Assignee name is required' },
+                 { pattern: /^[a-zA-Z\s]{4,}$/, message: 'At least 4 letters, alphabetic only' }
+               ]}
+               normalize={val => val ? val.replace(/\s+/g, ' ').trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.substr(1).toLowerCase()) : val}
+             >
+               <Input
+                 disabled={user?.role === "Viewer"}
+                 placeholder="At least 4 letters"
+               />
+             </Form.Item>
+           </Col>
+           <Col span={12}>
+             <Form.Item
+               name="position"
+               label="Position"
+               rules={[
+                 { required: true, message: "Position is required" },
+                 { pattern: /^[a-zA-Z\s]{2,}$/, message: "At least 2 letters, alphabetic only" }
+               ]}
+               normalize={val => val ? val.replace(/\s+/g, ' ').trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.substr(1).toLowerCase()) : val}
+             >
+               <Input disabled={user?.role === "Viewer"} placeholder="At least 2 letters"/>
+             </Form.Item>
+           </Col>
+           <Col span={12}>
+             <Form.Item
+               name="employeeEmail"
+               label="Employee Email"
+               rules={[{ required: true, type: 'email', message: 'Enter a valid email' }]}
+               normalize={val => val ? val.toLowerCase().trim() : val}
+             >
+               <Input disabled={user?.role === "Viewer"} placeholder="employee@company.com"/>
+             </Form.Item>
+           </Col>
+           <Col span={12}>
+             <Form.Item
+               name="phoneNumber"
+               label="Phone Number"
+               rules={[
+                 { required: true, message: 'Phone number is required' },
+                 {
+                   validator: (_, value) => {
+                     if (!value) return Promise.reject("Phone number is required");
+                     if (!/^\d{10}$/.test(value)) return Promise.reject("Phone number must be exactly 10 digits");
+                     if (/(\d)\1{6,}/.test(value)) return Promise.reject("No digit may repeat more than 6 times");
+                     return Promise.resolve();
+                   }
+                 }
+               ]}
+               normalize={val => val ? val.replace(/\D/g, '') : val}
+             >
+               <Input disabled={user?.role === "Viewer"} placeholder="10 digits" maxLength={10}/>
+             </Form.Item>
+           </Col>
+           <Col span={24}>
+             <Form.Item
+               name="department"
+               label="Department"
+               rules={[
+                 { required: true, message: "Department is required" },
+                 { pattern: /^[a-zA-Z\s]{2,}$/, message: "At least 2 letters, alphabetic only" }
+               ]}
+               normalize={val => val ? val.replace(/\s+/g, ' ').trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.substr(1).toLowerCase()) : val}
+             >
+               <Input disabled={user?.role === "Viewer"} placeholder="At least 2 letters"/>
+             </Form.Item>
+           </Col>
+         </Row>
+       </Form>
+     </Modal>
 
 
       {/* Edit Modal */}
-      <Modal
-        title={`Edit: ${selectedEditAsset?.model || ''}`}
-        open={isEditModalVisible}
-        onOk={handleSaveAssetEdit}
-        onCancel={() => { setIsEditModalVisible(false); setSelectedEditAsset(null); editForm.resetFields(); }}
-        okText="Save"
-        destroyOnClose
-        okButtonProps={{ disabled: user?.role === "Viewer" }}
-        cancelButtonProps={{ disabled: user?.role === "Viewer" }}
-        width={700}
-        centered
-      >
-        <Form layout="vertical" form={editForm}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="model" label="Model" rules={[{ required: true }]}>
-                <Input disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="category" label="Category" rules={[{ required: true }]}>
-                <Select disabled={user?.role === "Viewer"}>
-                  {categoryOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="serialNumber" label="Serial Number" rules={[{ required: true }]}>
-                <Input disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="status" label="Status">
-                <Input value="In Stock" disabled />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="location" label="Location" rules={[{ required: true }]}>
-                <Select disabled={user?.role === "Viewer"}>
-                  {locationOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="purchasePrice" label="Purchase Price">
-                <Input disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="purchaseDate" label="Purchase Date">
-                <DatePicker style={{ width: "100%" }} disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="warrantyInfo" label="Warranty Expiry">
-                <DatePicker style={{ width: "100%" }} disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={24}>
-              <Form.Item name="comment" label="Comment">
-                <Input.TextArea rows={2} disabled={user?.role === "Viewer"} />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
+     {/* Edit Modal */}
+     <Modal
+       title={`Edit: ${selectedEditAsset?.model || ''}`}
+       open={isEditModalVisible}
+       onOk={handleSaveAssetEdit}
+       onCancel={() => { setIsEditModalVisible(false); setSelectedEditAsset(null); editForm.resetFields(); }}
+       okText="Save"
+       destroyOnClose
+       okButtonProps={{ disabled: user?.role === "Viewer" }}
+       cancelButtonProps={{ disabled: user?.role === "Viewer" }}
+       width={700}
+       centered
+     >
+       <Form layout="vertical" form={editForm}>
+         <Row gutter={16}>
+           <Col span={12}>
+             <Form.Item
+               name="model"
+               label="Model"
+               rules={[
+                 { required: true, message: "Model is required" },
+                 { pattern: /^[A-Za-z\s]{2,}$/, message: "Model must be at least 2 alphabetic letters (title case suggested)" }
+               ]}
+             >
+               <Input disabled={user?.role === "Viewer"} />
+             </Form.Item>
+           </Col>
+           <Col span={12}>
+             <Form.Item name="category" label="Category" rules={[{ required: true }]}>
+               <Select disabled={user?.role === "Viewer"}>
+                 {categoryOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}
+               </Select>
+             </Form.Item>
+           </Col>
+         </Row>
+         <Row gutter={16}>
+           <Col span={12}>
+             <Form.Item
+               name="serialNumber"
+               label="Serial Number"
+               rules={[
+                 { required: true, message: "Serial number is required" },
+                 { min: 5, message: "Serial number must be at least 5 characters" }
+               ]}
+             >
+               <Input disabled={user?.role === "Viewer"} />
+             </Form.Item>
+           </Col>
+           <Col span={12}>
+             <Form.Item name="status" label="Status">
+               <Input value="In Stock" disabled />
+             </Form.Item>
+           </Col>
+         </Row>
+         <Row gutter={16}>
+           <Col span={12}>
+             <Form.Item name="location" label="Location" rules={[{ required: true }]}>
+               <Select disabled={user?.role === "Viewer"}>
+                 {locationOptions.map(opt => <Option key={opt} value={opt}>{opt}</Option>)}
+               </Select>
+             </Form.Item>
+           </Col>
+           <Col span={12}>
+             <Form.Item
+               name="purchasePrice"
+               label="Purchase Price"
+               rules={[
+                 { required: true, message: "Purchase price is required" },
+                 {
+                   validator: (_, value) => {
+                     if (value === undefined || value === '' || value === null) return Promise.resolve();
+                     if (isNaN(value) || Number(value) <= 0) return Promise.reject('Price must be a positive number');
+                     return Promise.resolve();
+                   }
+                 }
+               ]}
+             >
+               <Input disabled={user?.role === "Viewer"} />
+             </Form.Item>
+           </Col>
+         </Row>
+         <Row gutter={16}>
+           <Col span={12}>
+             <Form.Item name="purchaseDate" label="Purchase Date">
+               <DatePicker style={{ width: "100%" }} disabled={user?.role === "Viewer"} />
+             </Form.Item>
+           </Col>
+           <Col span={12}>
+             <Form.Item name="warrantyInfo" label="Warranty Expiry">
+               <DatePicker style={{ width: "100%" }} disabled={user?.role === "Viewer"} />
+             </Form.Item>
+           </Col>
+         </Row>
+         <Row gutter={16}>
+           <Col span={24}>
+             <Form.Item name="comment" label="Comment">
+               <Input.TextArea rows={2} disabled={user?.role === "Viewer"} />
+             </Form.Item>
+           </Col>
+         </Row>
+       </Form>
+     </Modal>
+
 
 
       {/* =========== Details Modal: TABLE BASED =========== */}
